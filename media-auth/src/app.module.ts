@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import config from './config/configuration';
-import { User } from './users/user.entity';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -15,9 +15,9 @@ import { User } from './users/user.entity';
       database: config.database.database,
       autoLoadEntities: true,
       synchronize: true,
-      entities:[User]
+      entities:[__dirname + '/../**/*.entity{.ts}',]
     })
-    ,UsersModule
+    ,UsersModule, AuthModule
   ],
   controllers: [],
   providers: [],

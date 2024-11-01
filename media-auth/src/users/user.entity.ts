@@ -1,8 +1,10 @@
 import { TimestampMixin } from "src/core/timestampMixin";
-import { Column, PrimaryGeneratedColumn ,BeforeInsert, BeforeUpdate, Entity } from "typeorm";
+import { Column, PrimaryGeneratedColumn ,BeforeInsert, BeforeUpdate, Entity, Index } from "typeorm";
 import { genSalt , hash, compare} from 'bcrypt';
 
-@Entity()
+
+@Entity('users')
+@Index(['username', 'email', 'id'], {unique: true})
 export class User extends TimestampMixin {
     @PrimaryGeneratedColumn("uuid")
     id: string;

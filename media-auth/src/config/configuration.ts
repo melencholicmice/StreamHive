@@ -2,24 +2,32 @@ import { config as dotenv_config } from 'dotenv';
 
 dotenv_config();
 
+function getEnvOrThrow(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Environment variable ${key} is not defined`);
+  }
+  return value;
+}
+
 const config = {
   port: parseInt(process.env.PORT,10) || 3000,
   database: {
-    url: process.env.DATABASE_URL,
-    host: process.env.DATABASE_HOST,
+    url: getEnvOrThrow('DATABASE_URL'),
+    host: getEnvOrThrow('DATABASE_HOST'),
     port: parseInt(process.env.DATABASE_PORT,10) || 5432,
-    username: process.env.DATABASE_USERNAME,
-    password: process.env.DATABASE_PASSWORD,
-    database: process.env.DATABASE_NAME,
+    username: getEnvOrThrow('DATABASE_USERNAME'),
+    password: getEnvOrThrow('DATABASE_PASSWORD'),
+    database: getEnvOrThrow('DATABASE_NAME'),
   },
   rabbitMq:{
-    url: process.env.RABBITMQ_URL,
-    host: process.env.RABBITMQ_HOST,
+    url: getEnvOrThrow('RABBITMQ_URL'),
+    host: getEnvOrThrow('RABBITMQ_HOST'),
     port: parseInt(process.env.RABBITMQ_PORT, 10) || 5672,
   },
   jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN,
+    secret: getEnvOrThrow('JWT_SECRET'),
+    expiresIn: getEnvOrThrow('JWT_EXPIRES_IN'),
   }
 };
 

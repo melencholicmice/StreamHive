@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import config from './config/configuration';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices';
+import * as cookieParser from 'cookie-parser'
+
 
 
 async function bootstrap() {
@@ -20,7 +22,8 @@ async function bootstrap() {
   );
 
   const httpApp = await NestFactory.create(AppModule);
-  httpApp.listen(config.port);
+  httpApp.use(cookieParser());
+  await httpApp.listen(config.port);
   await app.listen();
   
 }

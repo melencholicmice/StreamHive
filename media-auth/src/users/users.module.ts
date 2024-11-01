@@ -7,6 +7,7 @@ import { UsersController } from './users.controller';
 
 @Module({
   imports: [ZodValidationPipe, TypeOrmModule.forFeature([User])],
+  exports: [UsersService],
   providers: [UsersService],
   controllers: [UsersController]
 })
