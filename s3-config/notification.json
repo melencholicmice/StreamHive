@@ -1,0 +1,8 @@
+{
+    "queue": "video-upload-complete-queue",
+    "exchange": "minio_events",
+    "exchange_type": "fanout",
+    "routing_key": "upload.complete",
+    "amqp_url": "amqp://user:password@rabbitmq:5672"
+  }
+  

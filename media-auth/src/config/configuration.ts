@@ -28,6 +28,13 @@ const config = {
   jwt: {
     secret: getEnvOrThrow('JWT_SECRET'),
     expiresIn: getEnvOrThrow('JWT_EXPIRES_IN'),
+  },
+  s3: {
+    accessKeyId: getEnvOrThrow('S3_ACCESS_KEY_ID'),
+    secretAccessKey: getEnvOrThrow('S3_SECRET_ACCESS_KEY'),
+    region: getEnvOrThrow('S3_REGION'),
+    bucket: getEnvOrThrow('S3_BUCKET'),
+    endpoint: getEnvOrThrow('S3_ENDPOINT'),
   }
 };
 

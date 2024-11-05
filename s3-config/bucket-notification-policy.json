@@ -1,0 +1,21 @@
+{
+  "QueueConfigurations": [
+    {
+      "Id": "upload-complete-notification",
+      "QueueArn": "arn:minio:sqs::video-upload-complete-queue",
+      "Events": [
+        "s3:ObjectCreated:CompleteMultipartUpload"
+      ],
+      "Filter": {
+        "Key": {
+          "FilterRules": [
+            {
+              "Name": "suffix",
+              "Value": ".mp4"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
