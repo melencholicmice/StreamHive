@@ -4,22 +4,36 @@ import { uploadVideoDto, uploadVideoSchema } from './dto/uploadVideo.dto';
 import { uploadCompleteDto, uploadCompleteSchema } from './dto/uploadComplete.dto';
 import { ZodValidationPipe } from 'src/core/validation.pipe';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
+import { CurrentUser } from 'src/auth/currentUser.decorator';
+import { User } from 'src/users/user.entity';
+import { Video } from './video.entity';
 
 @Controller('videos')
 export class VideosController {
     constructor(private videoService: VideosService){}
 
     @Post('upload-start')
-    @UsePipes(new ZodValidationPipe(uploadVideoSchema))
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     async startUpload(
-        @Body() body : uploadVideoDto
+        @CurrentUser() user : User,
+        @Body(new ZodValidationPipe(uploadVideoSchema)) body : uploadVideoDto,
     ){
-        const uploadId = await this.videoService.initiateMultipartUpload(body.key);
-        return { uploadId};
+        try{
+            const uploadId = await this.videoService.initiateMultipartUpload(body.key);
+            const videoEntity : Video =  await this.videoService.createVideoEntity(body.key, body.description, user);
+            return { 
+                uploadId: uploadId,
+                videoId : videoEntity.id  
+            };
+        }
+        catch(error){
+            console.log(error.message);
+            throw error;
+        }
     }
 
     @Get('presigned-url')
+    @UseGuards(JwtAuthGuard)
     async getPresignedUrls(
         @Query('key') key: string,
         @Query('uploadId') uploadId: string,
@@ -30,13 +44,15 @@ export class VideosController {
     }
 
     @Post('upload-complete')
-    @UsePipes(new ZodValidationPipe(uploadCompleteSchema))
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     async completeUpload(
-        @Body() body : uploadCompleteDto
+        @CurrentUser() user: User,
+        @Body(new ZodValidationPipe(uploadCompleteSchema)) body : uploadCompleteDto
     ){
         await this.videoService.completeMultipartUpload(body.key, body.uploadId, body.parts);
+        await this.videoService.updateBucket(body.videoId, body.key);
         return { message: 'Upload complete' };
     }
+
 
 }

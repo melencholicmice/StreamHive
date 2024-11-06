@@ -24,6 +24,8 @@ const config = {
     url: getEnvOrThrow('RABBITMQ_URL'),
     host: getEnvOrThrow('RABBITMQ_HOST'),
     port: parseInt(process.env.RABBITMQ_PORT, 10) || 5672,
+    username: getEnvOrThrow('RABBITMQ_USERNAME'),
+    password: getEnvOrThrow('RABBITMQ_PASSWORD'),
   },
   jwt: {
     secret: getEnvOrThrow('JWT_SECRET'),

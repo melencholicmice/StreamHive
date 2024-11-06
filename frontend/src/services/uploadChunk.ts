@@ -4,8 +4,10 @@ export const uploadChunk = async (presignedUrl: string, fileChunk: Blob, uploadI
       body: fileChunk,
       headers: { 
         'Content-Type': 'application/octet-stream',
-        'uploadId': uploadId
+        'uploadId': uploadId,
+        'credentials': 'include'
       },
+      credentials: 'include'
     });
     if (!response.ok) {
       throw new Error(`Failed to upload chunk: ${response.statusText}`);

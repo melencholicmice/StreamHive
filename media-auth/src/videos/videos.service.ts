@@ -2,9 +2,18 @@ import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, S3Client,
 import { Injectable } from '@nestjs/common';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import config from 'src/config/configuration';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Video } from './video.entity';
+import { Repository } from 'typeorm';
+import { User } from 'src/users/user.entity';
 
 @Injectable()
 export class VideosService {
+
+    constructor(
+        @InjectRepository(Video) private videoRepository : Repository<Video>  
+    ){}
+
     private s3Client = new S3Client({
         region: config.s3.region,
         endpoint: config.s3.endpoint,
@@ -56,6 +65,16 @@ export class VideosService {
         return url;
     }
 
+    async createVideoEntity(title:string, description: string, user: User) {
+        const video = this.videoRepository.create({
+            title,
+            description,
+            user
+        });
+        const savedVideo = await this.videoRepository.save(video);
+        return savedVideo;
+    }
+
     async completeMultipartUpload(key: string, uploadId: string, parts: { PartNumber: number, ETag: string }[]) {
         const command = new CompleteMultipartUploadCommand({
             Bucket: config.s3.bucket,
@@ -65,7 +84,51 @@ export class VideosService {
                 Parts: parts,
             },
         })
-        await this.s3Client.send(command);
+        try {
+            const response = await this.s3Client.send(command);
+            if (response) {
+               return response;
+            }
+        } catch (error) {
+            console.log(error.message);
+            throw error;
+        }
+    }
+
+    async getVideosByUser(user: User) {
+        const videos = await this.videoRepository.find({
+            where: {
+                user
+            }
+        });
+        return videos;
+    }
+
+    async updateBucket(videoId: string, bucket: string) {
+        const video = await this.videoRepository.findOne({
+            where: {
+                id: videoId
+            }
+        });
+        if (!video) {
+            throw new Error('Video not found');
+        }
+        video.bucket = bucket;
+        const savedVideo = await this.videoRepository.save(video);
+        return savedVideo;
+    }
+
+
+    async getVideoById(videoId: string) {
+        const video = await this.videoRepository.findOne({
+            where: {
+                id: videoId
+            }
+        });
+        if (!video) {
+            throw new Error('Video not found');
+        }
+        return video;
     }
 
 }

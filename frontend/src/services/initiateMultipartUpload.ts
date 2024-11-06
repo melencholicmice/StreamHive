@@ -1,17 +1,26 @@
 import { config } from "../config";
-import { removeFileExtension } from "../utils/removeFileExtention";
+type InitiateMultipartUploadResponse = {
+  uploadId: string;
+  videoId: string;
+};
 
-export const initiateMultipartUpload = async (file: File): Promise<string> => {
+
+export const initiateMultipartUpload = async (key: string, description: string): Promise<InitiateMultipartUploadResponse> => {
   const response = await fetch(`${config.mediaAuthApiUrl}/videos/upload-start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'credentials': 'include'
+    },
     body: JSON.stringify({
-      key: removeFileExtension(file.name),
+      key: key,
+      description: description,
     }),
+    credentials: 'include'
   });
   if (!response.ok) {
     throw new Error(`Failed to initiate multipart upload: ${response.statusText}`);
   }
-  const { uploadId } = await response.json();
-  return uploadId;
+  const responseData: InitiateMultipartUploadResponse = await response.json();
+  return responseData;
 };

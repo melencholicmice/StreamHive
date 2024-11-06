@@ -3,6 +3,8 @@ import { UsersService } from './users.service';
 import { createUserDto, createUserSchema } from './dtos/createUser.dto';
 import { ZodValidationPipe } from 'src/core/validation.pipe';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
+import { CurrentUser } from 'src/auth/currentUser.decorator';
+import { User } from './user.entity';
 
 
 
@@ -20,5 +22,13 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     getUsers(){
         return this.usersService.getAllUser();
+    }
+
+    @Get('me')
+    @UseGuards(JwtAuthGuard)
+    getUser(
+        @CurrentUser() user: User
+    ){
+        return user;
     }
 }

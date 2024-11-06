@@ -15,7 +15,6 @@ export class JwtStratergy extends PassportStrategy(Strategy, 'jwt') {
         super({
             jwtFromRequest: ExtractJwt.fromExtractors([
                 (request: Request) => {
-                    console.log({...request.cookies})
                     return request.cookies?.Authentication
                 },
             ]),
@@ -24,7 +23,6 @@ export class JwtStratergy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     async validate(payload: TokenPayload){
-        console.log('entered here')
         const user  = await this.userService.findOneByEmail(payload.email);
         if(!user){
             throw new  UnauthorizedException('Invalid Request');
