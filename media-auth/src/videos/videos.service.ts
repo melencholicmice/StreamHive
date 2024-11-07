@@ -24,10 +24,18 @@ export class VideosService {
         forcePathStyle: true,
     })
 
-    async initiateMultipartUpload(key: string) {
+    createKey(userId: string, videoName: string, key: string) {
+        return `${userId}/${videoName}/${key}`;
+    }
+
+    createKeyDirectory(userId: string, videoName: string) {
+        return `${userId}/${videoName}/`;
+    }
+
+    async initiateMultipartUpload(key: string, userId:string, videoName : string) {
         const command = new CreateMultipartUploadCommand({
             Bucket: config.s3.bucket,
-            Key: key,
+            Key: this.createKey(userId, videoName, key),
         });
         
         try {
@@ -39,12 +47,12 @@ export class VideosService {
         }        
     }
 
-    async generatePresignedUrls(key: string, uploadId: string, totalParts: number) {
+    async generatePresignedUrls(key: string, uploadId: string, totalParts: number, userId: string, videoName: string) {
         const urls = [];
         for (let i = 1; i <= totalParts; i++) {
             const command = new UploadPartCommand({
                 Bucket: config.s3.bucket,
-                Key: key,
+                Key: this.createKey(userId, videoName, key),
                 UploadId: uploadId,
                 PartNumber: i,
             });
@@ -54,10 +62,10 @@ export class VideosService {
         return urls;
     }
 
-    async generatePresignedUrlByPartNumber(key: string, uploadId: string, partNumber: number) {
+    async generatePresignedUrlByPartNumber(key: string, uploadId: string, partNumber: number, userId: string, videoName: string) {
         const command = new UploadPartCommand({
             Bucket: config.s3.bucket,
-            Key: key,
+            Key: this.createKey(userId, videoName, key),
             UploadId: uploadId,
             PartNumber: partNumber,
         });
@@ -75,10 +83,10 @@ export class VideosService {
         return savedVideo;
     }
 
-    async completeMultipartUpload(key: string, uploadId: string, parts: { PartNumber: number, ETag: string }[]) {
+    async completeMultipartUpload(key: string, uploadId: string, parts: { PartNumber: number, ETag: string }[], userId: string, videoName: string) {
         const command = new CompleteMultipartUploadCommand({
             Bucket: config.s3.bucket,
-            Key: key,
+            Key: this.createKey(userId, videoName, key),
             UploadId: uploadId,
             MultipartUpload: {
                 Parts: parts,
@@ -104,7 +112,7 @@ export class VideosService {
         return videos;
     }
 
-    async updateBucket(videoId: string, bucket: string) {
+    async updateBucketLocation(userId: string,videoName: string,videoId:string, key: string) {
         const video = await this.videoRepository.findOne({
             where: {
                 id: videoId
@@ -113,7 +121,7 @@ export class VideosService {
         if (!video) {
             throw new Error('Video not found');
         }
-        video.bucket = bucket;
+        video.bucket = this.createKey(userId, videoName, key);
         const savedVideo = await this.videoRepository.save(video);
         return savedVideo;
     }

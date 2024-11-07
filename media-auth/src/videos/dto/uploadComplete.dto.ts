@@ -5,6 +5,7 @@ export const uploadCompleteSchema = z.object({
     uploadId: z.string(),
     parts: z.array(z.any()),
     videoId: z.string(),
+    videoName: z.string(),
 })
 
 export type uploadCompleteDto = z.infer<typeof uploadCompleteSchema>;

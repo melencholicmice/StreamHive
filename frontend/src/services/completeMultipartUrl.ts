@@ -10,6 +10,7 @@ export const completeMultipartUpload = async (
     uploadId: string,
     parts: Part[],
     videoId: string,
+    videoName: string
 ) : Promise<void> => {
     await fetch(`${config.mediaAuthApiUrl}/videos/upload-complete`, {
         method: 'POST',
@@ -22,6 +23,7 @@ export const completeMultipartUpload = async (
           uploadId: uploadId,
           parts: parts,
           videoId: videoId,
+          videoName: videoName,
         }),
         credentials: 'include',
     });

@@ -3,7 +3,7 @@ import { initiateMultipartUpload } from '../services/initiateMultipartUpload';
 import { getPresignedUrl } from '../services/getPresignedUrl';
 import { uploadChunk } from '../services/uploadChunk';
 import { completeMultipartUpload } from '../services/completeMultipartUrl';
-import { removeFileExtension } from '../utils/removeFileExtention';
+// import { removeFileExtension } from '../utils/removeFileExtention';
 
 type Part = {
   ETag: string;
@@ -36,8 +36,9 @@ function FileUpload() {
     }
     try{
       const {uploadId,videoId } = await initiateMultipartUpload(
-        videoName,
+        file.name,
         description,
+        videoName,
       );
   
       const partSize = 5 * 1024 * 1024; // 5MB
@@ -48,7 +49,7 @@ function FileUpload() {
         const end = Math.min(start + partSize, file.size);
         const fileChunk = file.slice(start, end);
   
-        const presignedUrl = await getPresignedUrl(uploadId, videoName, partNumber) 
+        const presignedUrl = await getPresignedUrl(uploadId, file.name, partNumber, videoName) 
         console.log(presignedUrl)
         const uploadResponse = await uploadChunk(presignedUrl, fileChunk, uploadId);
         const eTag = uploadResponse.headers.get('ETag') || '';
@@ -57,10 +58,11 @@ function FileUpload() {
       }
   
       await completeMultipartUpload(
-        videoName,
+        file.name,
         uploadId,
         parts,
-        videoId
+        videoId,
+        videoName
       )
       alert('File uploaded successfully');
       setFile(null);

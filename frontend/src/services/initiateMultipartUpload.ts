@@ -5,7 +5,7 @@ type InitiateMultipartUploadResponse = {
 };
 
 
-export const initiateMultipartUpload = async (key: string, description: string): Promise<InitiateMultipartUploadResponse> => {
+export const initiateMultipartUpload = async (key: string, description: string, videoName: string): Promise<InitiateMultipartUploadResponse> => {
   const response = await fetch(`${config.mediaAuthApiUrl}/videos/upload-start`, {
     method: 'POST',
     headers: { 
@@ -15,6 +15,7 @@ export const initiateMultipartUpload = async (key: string, description: string):
     body: JSON.stringify({
       key: key,
       description: description,
+      videoName: videoName,
     }),
     credentials: 'include'
   });
