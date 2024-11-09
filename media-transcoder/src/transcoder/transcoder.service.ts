@@ -143,8 +143,8 @@ export class TranscoderService {
             });
 
             await container.start();
-            const logs = await this.getDockerLogs(container);
-            console.log(`Transcoding logs for ${resolution.resolution}:`, logs);
+            // const logs = await this.getDockerLogs(container);
+            // console.log(`Transcoding logs for ${resolution.resolution}:`, logs);
 
             const result = await container.wait();
             if (result.StatusCode !== 0) {
@@ -162,10 +162,15 @@ export class TranscoderService {
         for (const file of files) {
             const filePath = path.join(outputDir, file);
             const fileContent = await fs.promises.readFile(filePath);
-            const s3Key = `${videoKey}/${file}`;
+            const s3Key = `${this.getDirectoryFromFilePath(videoKey)}${file}`;
             
             await this.uploadFileToS3(s3Key, fileContent);
         }
+    }
+
+    private getDirectoryFromFilePath(filePath: string): string {
+        const parts = filePath.split('/');
+        return parts.slice(0, parts.length - 1).join('/') + '/';
     }
 
     private async uploadFileToS3(key: string, body: Buffer) {
@@ -176,7 +181,7 @@ export class TranscoderService {
         };
 
         try {
-            await this.s3Client.send(new PutObjectCommand(uploadParams));
+            const response = await this.s3Client.send(new PutObjectCommand(uploadParams));
             console.log(`Successfully uploaded ${key} to S3`);
         } catch (error) {
             console.error(`Failed to upload ${key} to S3:`, error);
@@ -185,11 +190,12 @@ export class TranscoderService {
     }
 
     private async createAndUploadIndexPlaylist(videoKey: string) {
+        const directoryKey = this.getDirectoryFromFilePath(videoKey);
         const indexContent = this.generateIndexPlaylistContent();
-        const indexKey = `${videoKey}/index.m3u8`;
+        const indexKey = `${directoryKey}index.m3u8`;
         
         await this.uploadFileToS3(indexKey, Buffer.from(indexContent));
-        console.log(`Created and uploaded index playlist for ${videoKey}`);
+        console.log(`Created and uploaded index playlist for ${directoryKey}`);
     }
 
     private generateIndexPlaylistContent(): string {
@@ -216,31 +222,4 @@ export class TranscoderService {
         console.log(`Transcoding completed for video: ${videoKey}`);
     }
 
-    private async getDockerLogs(container: Docker.Container): Promise<string> {
-        return new Promise<string>((resolve, reject) => {
-            container.logs({
-                follow: true,
-                stdout: true,
-                stderr: true,
-            }, (err, stream) => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
-
-                let logs = '';
-                stream.on('data', (chunk) => {
-                    logs += chunk.toString('utf8');
-                });
-
-                stream.on('end', () => {
-                    resolve(logs);
-                });
-
-                stream.on('error', (error) => {
-                    reject(error);
-                });
-            });
-        });
-    }
 }

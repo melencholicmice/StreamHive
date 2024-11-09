@@ -65,25 +65,24 @@ export class VideosController {
             uploadId : body.uploadId,
         })
         console.log('starting event emitter');
-        // this.client.emit('video-uploaded', {
-        //     userId: user.id,
-        //     key: body.key,
-        //     uploadId : body.uploadId,
-        // });
-        console.log("key:= " + body.key);
+        this.videoQueue.add('video-transcoding-job', {
+            userId: user.id,
+            key: `${this.videoService.createKeyDirectory(user.id, body.videoName)}${body.key}`,
+        });
+        console.log("key:= " + `${this.videoService.createKeyDirectory(user.id, body.videoName)}${body.key}`);
         console.log('video uploaded event emitted');
         return { message: 'Upload complete' };
     }
 
-    @Get('test-microservice')
-    async testMicroservice() {
-        // 
-        this.videoQueue.add('video-transcoding-job', {
-            userId: 1,
-            key: '6207e176-54d1-43fb-b9d1-aec6e0bef3ff/job-test-1/Video_2024-09-21_15-56-00.mp4',
-            uploadId: 'test-upload-id',
-        });
-        console.log('video uploaded event emitted');
-        return { message: 'Upload complete' };
-    }
+    // @Get('test-microservice')
+    // async testMicroservice() {
+    //     // 
+    //     this.videoQueue.add('video-transcoding-job', {
+    //         userId: 1,
+    //         key: '6207e176-54d1-43fb-b9d1-aec6e0bef3ff/job-test-1/Video_2024-09-21_15-56-00.mp4',
+    //         uploadId: 'test-upload-id',
+    //     });
+    //     console.log('video uploaded event emitted');
+    //     return { message: 'Upload complete' };
+    // }
 }
