@@ -1,25 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TranscoderService } from './transcoder.service';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import config from 'src/config/configuration';
+import { TranscoderController } from './transcoder.controller';
+import { BullModule } from '@nestjs/bullmq';
 
 
 @Module({
   imports: [
-    ClientsModule.register([
-      {
-        name: 'NOTIFICATION_SERVICE',
-        transport: Transport.RMQ,
-        options: {
-          urls: [config.rabbitMq.url],
-          queue: 'notification-queue',
-          queueOptions: {
-            durable: false,
-          },
-        },
-      },
-    ]),
-  ],
-  providers: [TranscoderService]
+  BullModule.registerQueue({
+    name: 'video-queue', 
+  })],
+  providers: [TranscoderService],
+  controllers: [TranscoderController]
 })
+
 export class TranscoderModule {}

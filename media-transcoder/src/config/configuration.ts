@@ -20,19 +20,24 @@ const config = {
 //     password: getEnvOrThrow('DATABASE_PASSWORD'),
 //     database: getEnvOrThrow('DATABASE_NAME'),
 //   },
-  rabbitMq:{
-    url: getEnvOrThrow('RABBITMQ_URL'),
-    host: getEnvOrThrow('RABBITMQ_HOST'),
-    port: parseInt(process.env.RABBITMQ_PORT, 10) || 5672,
-    username: getEnvOrThrow('RABBITMQ_USERNAME'),
-    password: getEnvOrThrow('RABBITMQ_PASSWORD'),
-  },
+  // rabbitMq:{
+  //   url: getEnvOrThrow('RABBITMQ_URL'),
+  //   host: getEnvOrThrow('RABBITMQ_HOST'),
+  //   port: parseInt(process.env.RABBITMQ_PORT, 10) || 5672,
+  //   username: getEnvOrThrow('RABBITMQ_USERNAME'),
+  //   password: getEnvOrThrow('RABBITMQ_PASSWORD'),
+  // },
   s3: {
     accessKeyId: getEnvOrThrow('S3_ACCESS_KEY_ID'),
     secretAccessKey: getEnvOrThrow('S3_SECRET_ACCESS_KEY'),
     region: getEnvOrThrow('S3_REGION'),
     bucket: getEnvOrThrow('S3_BUCKET'),
     endpoint: getEnvOrThrow('S3_ENDPOINT'),
+  },
+  redis: {
+    host: getEnvOrThrow('REDIS_HOST'),
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    password: getEnvOrThrow('REDIS_PASSWORD'),
   }
 };
 

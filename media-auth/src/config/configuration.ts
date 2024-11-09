@@ -37,6 +37,11 @@ const config = {
     region: getEnvOrThrow('S3_REGION'),
     bucket: getEnvOrThrow('S3_BUCKET'),
     endpoint: getEnvOrThrow('S3_ENDPOINT'),
+  },
+  reddis :{
+    host: getEnvOrThrow('REDIS_HOST'),
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    password: getEnvOrThrow('REDIS_PASSWORD'),
   }
 };
 

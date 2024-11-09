@@ -1,32 +1,22 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
-import * as stream from 'stream';
-import { pipeline } from 'stream/promises';
-import Docker  from 'dockerode';
-import { connect,Connection, Channel } from 'amqplib';
+import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import Docker from 'dockerode';
 import config from 'src/config/configuration';
+import { Readable } from 'stream';
 
 @Injectable()
-export class TranscoderService implements OnModuleInit {
+export class TranscoderService {
     private docker: Docker;
-    private s3Client: S3Client; 
-    private connection: Connection;
-    private channel: Channel;
+    private s3Client: S3Client;
 
     private resolutions = [
-        { resolution : '144p', width: 256, height: 144 },
-        { resolution : '240p', width: 426, height: 240 },
-        { resolution : '360p', width: 640, height: 360 },
-        { resolution : '480p', width: 854, height: 480 },
-        { resolution : '720p', width: 1280, height: 720 },
-        { resolution : '1080p', width: 1920, height: 1080 },
-    ]
+        { resolution: '720p', width: 1280, height: 720, bitrate: '4000k' },
+    ];
 
-    constructor(
-        @Inject('NOTIFICATION_SERVICE') private readonly client: ClientProxy,
-    ){
-        this.docker = new Docker();
+    constructor() {
         this.s3Client = new S3Client({
             region: config.s3.region,
             endpoint: config.s3.endpoint,
@@ -36,109 +26,221 @@ export class TranscoderService implements OnModuleInit {
             },
             forcePathStyle: true,
         });
+        this.docker = new Docker();
     }
 
-    async onModuleInit() {
-        this.connection = await connect(config.rabbitMq.url);
-        this.channel = await this.connection.createChannel();
+    async startTranscoding(videoKey: string, jobId: string) {
+        // Create temp directories for input and output
+        const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'video-'));
+        const inputDir = path.join(tempDir, 'input');
+        const outputDir = path.join(tempDir, 'output');
+        
+        // Create both directories
+        await fs.promises.mkdir(inputDir);
+        await fs.promises.mkdir(outputDir);
 
-        const queue = 'video-queue';
-        await this.channel.assertQueue(queue, { durable: false });
-        console.log('Transcoder service initialized and listening to queue:', queue);
-
-        this.channel.consume(queue, async (message) => {
-            if (message){
-                const { videoKey } = JSON.parse(message.content.toString());
-                console.log(`Received message for video: ${videoKey}`);
-                await this.startTranscoding(videoKey);
-                this.channel.ack(message);
-            }
-        })
-    }
-
-    private async startTranscoding(videoKey: string){
         try {
-            await Promise.all(
-              this.resolutions.map(async (resolution) => {
-                await this.transcodeToResolution(videoKey, resolution.resolution, resolution.width, resolution.height);
-              }),
-            );
+            console.log(`Downloading video: ${videoKey}`);
+            const inputPath = await this.downloadVideo(videoKey, inputDir);
+            
+            console.log('Starting transcoding process');
+            for (const resolution of this.resolutions) {
+                console.log(`Processing resolution: ${resolution.resolution}`);
+                await this.transcodeToResolution(videoKey, jobId, resolution, inputDir, outputDir);
+            }
+
+            await this.uploadTranscodedFiles(videoKey, outputDir);
+            await this.createAndUploadIndexPlaylist(videoKey);
             await this.notifyCompletion(videoKey);
+
         } catch (error) {
             console.error(`Error during transcoding for video: ${videoKey}`, error);
+            throw error;
+        } finally {
+            await this.cleanup(tempDir);
         }
     }
 
-    private async transcodeToResolution(videoKey: string, resolution: string, width: number, height: number) {
-        const inputStream = await this.downloadVideoFromS3(videoKey);
-        const containerName = `video-transcoder-${videoKey}-${resolution}`;
+    private async downloadVideo(videoKey: string, inputDir: string): Promise<string> {
+        const inputPath = path.join(inputDir, 'input.mp4');
         
-        const container = await this.docker.createContainer({
-          Image: 'jrottenberg/ffmpeg',
-          name: containerName,
-          Cmd: [
-            '-i', 'pipe:0', // FFmpeg will read from stdin (piped input)
-            '-vf', `scale=${width}:-2`,
-            '-c:v', 'libx264',
-            '-preset', 'fast',
-            '-crf', '28',
-            'pipe:1', // FFmpeg will output to stdout (piped output)
-          ],
-        });
-    
-        const containerStream = await container.attach({ stream: true, stdin: true, stdout: true, stderr: true });
-        
-        // Start the container before piping
-        await container.start();
-        console.log(`Transcoding ${videoKey} to ${resolution} resolution`);
-    
-        // Create a PassThrough stream to handle the container output
-        const outputStream = new stream.PassThrough();
-        containerStream.pipe(outputStream);
-
-        await Promise.all([
-          pipeline(inputStream, containerStream),
-          this.uploadToS3(outputStream, `${videoKey}/${resolution}-${videoKey}`),
-        ]);
-    
-        // Pipe the input stream to the container's stdin, and output stream from FFmpeg to S3
-        await container.wait();
-        console.log(`Transcoding ${videoKey} to ${resolution} resolution completed`);
-    
-        await container.remove();
-        console.log(`Container ${containerName} removed`);
-    }
-    
-
-    private async downloadVideoFromS3(videoKey: string): Promise<stream.Readable> {
-        const command = new GetObjectCommand({
-            Bucket: config.s3.bucket,
-            Key: videoKey,
-        });
-
-        const data = await this.s3Client.send(command);
-
-        return data.Body as stream.Readable;
-    }
-
-    private async uploadToS3(inputStream: stream.Readable, destinationKey: string) {
-        const uploadParams = {
-          Bucket: config.s3.bucket,
-          Key: destinationKey,
-          Body: inputStream,
-        };
-    
         try {
-          await this.s3Client.send(new PutObjectCommand(uploadParams));
-          console.log(`Uploaded ${destinationKey} to S3`);
+            const command = new GetObjectCommand({
+                Bucket: config.s3.bucket,
+                Key: videoKey,
+            });
+
+            const response = await this.s3Client.send(command);
+            if (!response.Body) {
+                throw new Error('No response body from S3');
+            }
+
+            const writeStream = fs.createWriteStream(inputPath);
+            await new Promise((resolve, reject) => {
+                (response.Body as unknown as Readable)
+                    .pipe(writeStream)
+                    .on('error', reject)
+                    .on('finish', resolve);
+            });
+
+            return inputPath;
         } catch (error) {
-          console.error(`Failed to upload ${destinationKey} to S3`, error);
+            console.error(`Error downloading video ${videoKey}:`, error);
+            throw error;
+        }
+    }
+
+    private async transcodeToResolution(
+        videoKey: string,
+        jobId: string,
+        resolution: { resolution: string; width: number; height: number; bitrate: string },
+        inputDir: string,
+        outputDir: string
+    ) {
+        const containerName = `video-transcoder-${jobId}-${resolution.resolution}`;
+        console.log('Input directory:', inputDir);
+        console.log('Output directory:', outputDir);
+
+        const container = await this.docker.createContainer({
+            Image: 'jrottenberg/ffmpeg',
+            name: containerName,
+            Cmd: [
+                '-i', '/input/input.mp4', // Changed to match the downloaded file name
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-b:v', resolution.bitrate,
+                '-maxrate', resolution.bitrate,
+                '-bufsize', `${parseInt(resolution.bitrate) * 2}k`,
+                '-vf', `scale=${resolution.width}:${resolution.height}`,
+                '-preset', 'veryfast',
+                '-profile:v', 'main',
+                '-sc_threshold', '0',
+                '-g', '48',
+                '-keyint_min', '48',
+                '-hls_time', '4',
+                '-hls_list_size', '0',
+                '-hls_segment_filename', `/output/${resolution.resolution}-%03d.ts`,
+                '-hls_flags', 'independent_segments',
+                '-f', 'hls',
+                `/output/${resolution.resolution}.m3u8`,
+            ],
+            HostConfig: {
+                Binds: [
+                    `${inputDir}:/input`, // Bind the input directory
+                    `${outputDir}:/output`, // Bind the output directory
+                ],
+                AutoRemove: true,
+            },
+            Tty: false,
+        });
+
+        try {
+            // Add debug logging
+            console.log('Docker container configuration:', {
+                inputBinding: `${inputDir}:/input`,
+                outputBinding: `${outputDir}:/output`,
+                inputFile: '/input/input.mp4'
+            });
+
+            await container.start();
+            const logs = await this.getDockerLogs(container);
+            console.log(`Transcoding logs for ${resolution.resolution}:`, logs);
+
+            const result = await container.wait();
+            if (result.StatusCode !== 0) {
+                throw new Error(`Transcoding failed with status ${result.StatusCode}`);
+            }
+        } catch (error) {
+            console.error(`Error processing resolution ${resolution.resolution}:`, error);
+            throw error;
+        }
+    }
+
+    private async uploadTranscodedFiles(videoKey: string, outputDir: string) {
+        const files = await fs.promises.readdir(outputDir);
+        
+        for (const file of files) {
+            const filePath = path.join(outputDir, file);
+            const fileContent = await fs.promises.readFile(filePath);
+            const s3Key = `${videoKey}/${file}`;
+            
+            await this.uploadFileToS3(s3Key, fileContent);
+        }
+    }
+
+    private async uploadFileToS3(key: string, body: Buffer) {
+        const uploadParams = {
+            Bucket: config.s3.bucket,
+            Key: key,
+            Body: body,
+        };
+
+        try {
+            await this.s3Client.send(new PutObjectCommand(uploadParams));
+            console.log(`Successfully uploaded ${key} to S3`);
+        } catch (error) {
+            console.error(`Failed to upload ${key} to S3:`, error);
+            throw error;
+        }
+    }
+
+    private async createAndUploadIndexPlaylist(videoKey: string) {
+        const indexContent = this.generateIndexPlaylistContent();
+        const indexKey = `${videoKey}/index.m3u8`;
+        
+        await this.uploadFileToS3(indexKey, Buffer.from(indexContent));
+        console.log(`Created and uploaded index playlist for ${videoKey}`);
+    }
+
+    private generateIndexPlaylistContent(): string {
+        let indexContent = '#EXTM3U\n#EXT-X-VERSION:3\n';
+
+        for (const resolution of this.resolutions) {
+            indexContent += `#EXT-X-STREAM-INF:BANDWIDTH=${parseInt(resolution.bitrate) * 1000},RESOLUTION=${resolution.width}x${resolution.height}\n`;
+            indexContent += `${resolution.resolution}.m3u8\n`;
+        }
+
+        return indexContent;
+    }
+
+    private async cleanup(tempDir: string) {
+        try {
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+            console.log(`Cleaned up temporary directory: ${tempDir}`);
+        } catch (error) {
+            console.error(`Error cleaning up temporary directory ${tempDir}:`, error);
         }
     }
 
     private async notifyCompletion(videoKey: string) {
-        const message = { videoKey, status: 'completed' };
-        console.log(`Notifying completion for video: ${videoKey}`);
-        this.client.emit('video-trancoding-completed', message);
+        console.log(`Transcoding completed for video: ${videoKey}`);
+    }
+
+    private async getDockerLogs(container: Docker.Container): Promise<string> {
+        return new Promise<string>((resolve, reject) => {
+            container.logs({
+                follow: true,
+                stdout: true,
+                stderr: true,
+            }, (err, stream) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+
+                let logs = '';
+                stream.on('data', (chunk) => {
+                    logs += chunk.toString('utf8');
+                });
+
+                stream.on('end', () => {
+                    resolve(logs);
+                });
+
+                stream.on('error', (error) => {
+                    reject(error);
+                });
+            });
+        });
     }
 }

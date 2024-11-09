@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import config from './config/configuration';
 import { AuthModule } from './auth/auth.module';
 import { VideosModule } from './videos/videos.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -17,8 +18,15 @@ import { VideosModule } from './videos/videos.module';
       autoLoadEntities: true,
       synchronize: true,
       entities:[__dirname + '/../**/*.entity{.ts}',]
-    })
-    ,UsersModule, AuthModule, VideosModule
+    }),
+    BullModule.forRoot({
+      connection: {
+        host: config.reddis.host,
+        port: config.reddis.port,
+        // password: config.reddis.password,
+      },
+    }),
+    UsersModule, AuthModule, VideosModule,
   ],
   controllers: [],
   providers: [],

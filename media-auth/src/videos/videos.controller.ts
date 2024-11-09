@@ -7,14 +7,15 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/currentUser.decorator';
 import { User } from 'src/users/user.entity';
 import { Video } from './video.entity';
-import { ClientProxy } from '@nestjs/microservices';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 
 @Controller('videos')
 export class VideosController {
     constructor(
         private videoService: VideosService,
-        @Inject('NOTIFICATION_SERVICE') private client: ClientProxy 
+        @InjectQueue('video-queue') private videoQueue: Queue,
     ){}
 
     @Post('upload-start')
@@ -58,11 +59,31 @@ export class VideosController {
     ){
         await this.videoService.completeMultipartUpload(body.key, body.uploadId, body.parts,user.id, body.videoName);
         await this.videoService.updateBucketLocation(user.id, body.videoName,body.videoId, body.key);
-        this.client.emit('video-uploaded', {
+        console.log({
             userId: user.id,
             key: body.key,
             uploadId : body.uploadId,
+        })
+        console.log('starting event emitter');
+        // this.client.emit('video-uploaded', {
+        //     userId: user.id,
+        //     key: body.key,
+        //     uploadId : body.uploadId,
+        // });
+        console.log("key:= " + body.key);
+        console.log('video uploaded event emitted');
+        return { message: 'Upload complete' };
+    }
+
+    @Get('test-microservice')
+    async testMicroservice() {
+        // 
+        this.videoQueue.add('video-transcoding-job', {
+            userId: 1,
+            key: '6207e176-54d1-43fb-b9d1-aec6e0bef3ff/job-test-1/Video_2024-09-21_15-56-00.mp4',
+            uploadId: 'test-upload-id',
         });
+        console.log('video uploaded event emitted');
         return { message: 'Upload complete' };
     }
 }
