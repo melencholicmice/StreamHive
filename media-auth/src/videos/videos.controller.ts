@@ -26,7 +26,11 @@ export class VideosController {
     ){
         try{
             const uploadId = await this.videoService.initiateMultipartUpload(body.key,user.id,body.videoName);
-            const videoEntity : Video =  await this.videoService.createVideoEntity(body.key, body.description, user);
+            const videoEntity : Video =  await this.videoService.createVideoEntity(
+                body.videoName, 
+                body.description, 
+                user
+            );
             return { 
                 uploadId: uploadId,
                 videoId : videoEntity.id  
@@ -74,15 +78,13 @@ export class VideosController {
         return { message: 'Upload complete' };
     }
 
-    @Get('test-microservice')
-    async testMicroservice() {
-        // 
-        this.videoQueue.add('video-transcoding-job', {
-            userId: 1,
-            key: '6207e176-54d1-43fb-b9d1-aec6e0bef3ff/test 1/Video_2024-09-21_15-56-00.mp4',
-            uploadId: 'test-upload-id',
-        });
-        console.log('video uploaded event emitted');
-        return { message: 'Upload complete' };
+    @Get('all-videos')
+    async getAllVideos(){
+        return this.videoService.getAllVideos()
+    }
+
+    @Get('video-by-id')
+    async getVideoById(@Query('videoId') videoId: string){
+        return this.videoService.getVideoById(videoId);
     }
 }

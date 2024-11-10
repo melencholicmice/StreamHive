@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import config from 'src/config/configuration';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Video } from './video.entity';
+import { Video, VideoStatus } from './video.entity';
 import { Repository } from 'typeorm';
 import { User } from 'src/users/user.entity';
 
@@ -121,7 +121,8 @@ export class VideosService {
         if (!video) {
             throw new Error('Video not found');
         }
-        video.bucket = this.createKey(userId, videoName, key);
+        video.bucket = this.createKeyDirectory(userId, videoName);
+        video.status = VideoStatus.UPLOADED;
         const savedVideo = await this.videoRepository.save(video);
         return savedVideo;
     }
@@ -138,5 +139,28 @@ export class VideosService {
         }
         return video;
     }
+
+    async getAllVideos(): Promise<Video[]> {
+        return await this.videoRepository.find({
+            relations: {
+                user: true
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                bucket: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+                user: {
+                    id: true,
+                    username: true
+                }
+            }
+        });
+    }
+
+
 
 }
