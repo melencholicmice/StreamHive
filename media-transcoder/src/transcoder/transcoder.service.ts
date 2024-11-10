@@ -63,7 +63,7 @@ export class TranscoderService {
                 `-b:a:${index}`, `${192 - (index * 48)}k`,
                 `-ac`, '2'
             ]),
-            '-master_pl_name', 'master.m3u8', // Master playlist
+            '-master_pl_name', '/output/master.m3u8', // Master playlist
             '-hls_playlist_type', 'vod',
             '-hls_time', '4',
             '-hls_list_size', '0',
@@ -83,6 +83,12 @@ export class TranscoderService {
         await fs.promises.mkdir(inputDir);
         await fs.promises.mkdir(outputDir);
 
+        // Create resolution directories
+        for (const resolution of this.resolutions) {
+            const resolutionDir = path.join(outputDir, resolution.resolution);
+            await fs.promises.mkdir(resolutionDir, { recursive: true });
+        }
+
         try {
             console.log(`Downloading video: ${videoKey}`);
             const inputPath = await this.downloadVideo(videoKey, inputDir);
@@ -92,7 +98,7 @@ export class TranscoderService {
             await this.transcodeToResolution(jobId, inputDir, outputDir);
 
             await this.uploadTranscodedFiles(videoKey, outputDir);
-            // await this.createAndUploadIndexPlaylist(videoKey);
+            await this.createAndUploadIndexPlaylist(videoKey);
             await this.notifyCompletion(videoKey);
 
         } catch (error) {
@@ -125,7 +131,7 @@ export class TranscoderService {
                     .on('finish', resolve);
             });
 
-            return inputPath;inputPath
+            return inputPath;
         } catch (error) {
             console.error(`Error downloading video ${videoKey}:`, error);
             throw error;
@@ -167,6 +173,17 @@ export class TranscoderService {
             });
 
             await container.start();
+
+            // Attach to container logs and stream them to console
+            const logStream = await container.logs({
+                follow: true,
+                stdout: true,
+                stderr: true
+            });
+            logStream.on('data', (chunk) => {
+                console.log(chunk.toString('utf8'));
+            });
+
             const result = await container.wait();
             if (result.StatusCode !== 0) {
                 throw new Error(`Transcoding failed with status ${result.StatusCode}`);
@@ -178,13 +195,6 @@ export class TranscoderService {
     }
 
     private async uploadTranscodedFiles(videoKey: string, outputDir: string) {
-        // Upload the master.m3u8 file as a buffer
-        const masterPlaylistPath = path.join(outputDir, 'master.m3u8');
-        if (fs.existsSync(masterPlaylistPath)) {
-            const masterBuffer = await fs.promises.readFile(masterPlaylistPath);
-            await this.uploadFileToS3(`${this.getDirectoryFromFilePath(videoKey)}master.m3u8`, masterBuffer);
-        }
-    
         // Iterate over each resolution folder and upload files as buffers
         for (const resolution of this.resolutions) {
             const resolutionDir = path.join(outputDir, resolution.resolution);
