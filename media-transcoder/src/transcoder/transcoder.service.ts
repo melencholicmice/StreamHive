@@ -13,7 +13,10 @@ export class TranscoderService {
     private s3Client: S3Client;
 
     private resolutions = [
-        { resolution: '720p', width: 1280, height: 720, bitrate: '4000k' },
+        { resolution: '1080p', width: 1920, height: 1080, bitrate: '5000k' },
+        { resolution: '720p', width: 1280, height: 720, bitrate: '3000k' },
+        { resolution: '480p', width: 854, height: 480, bitrate: '1500k' },
+        { resolution: '360p', width: 640, height: 360, bitrate: '800k' },
     ];
 
     constructor() {
@@ -29,6 +32,47 @@ export class TranscoderService {
         this.docker = new Docker();
     }
 
+    private createResolutionCommands(): string[] {
+        const commands = [
+            '-filter_complex',
+            `[0:v]split=${this.resolutions.length}${this.resolutions.map((_, index) => `[v${index}]`).join('')};${
+                this.resolutions.map((resolution, index) => 
+                    `[v${index}]scale=w=${resolution.width}:h=${resolution.height}[v${index}out]`
+                ).join(';')
+            }`,
+            ...this.resolutions.flatMap((resolution, index) => [
+                `-map`, `[v${index}out]`,
+                `-c:v:${index}`, 'libx264',
+                `-b:v:${index}`, resolution.bitrate,
+                `-maxrate:v:${index}`, `${parseInt(resolution.bitrate) * 1.07}k`,
+                `-bufsize:v:${index}`, `${parseInt(resolution.bitrate) * 1.5}k`,
+                '-preset', 'veryfast',
+                '-profile:v', 'main',
+                '-sc_threshold', '0',
+                '-g', '48',
+                '-keyint_min', '48',
+                `-hls_segment_filename`, `/output/${resolution.resolution}/segment-%03d.ts`, // Customized output folder per resolution
+                `-hls_flags`, 'independent_segments',
+                `-f`, 'hls',
+                `/output/${resolution.resolution}/playlist.m3u8`, // Playlist file per resolution
+            ]),
+            // Configure audio streams and playlist generation
+            ...this.resolutions.flatMap((_, index) => [
+                `-map`, 'a:0',
+                `-c:a:${index}`, 'aac',
+                `-b:a:${index}`, `${192 - (index * 48)}k`,
+                `-ac`, '2'
+            ]),
+            '-master_pl_name', 'master.m3u8', // Master playlist
+            '-hls_playlist_type', 'vod',
+            '-hls_time', '4',
+            '-hls_list_size', '0',
+            '-var_stream_map', this.resolutions.map((_, index) => `v:${index},a:${index}`).join(' ')
+        ];
+        
+        return commands;
+    }
+    
     async startTranscoding(videoKey: string, jobId: string) {
         // Create temp directories for input and output
         const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'video-'));
@@ -44,13 +88,11 @@ export class TranscoderService {
             const inputPath = await this.downloadVideo(videoKey, inputDir);
             
             console.log('Starting transcoding process');
-            for (const resolution of this.resolutions) {
-                console.log(`Processing resolution: ${resolution.resolution}`);
-                await this.transcodeToResolution(videoKey, jobId, resolution, inputDir, outputDir);
-            }
+           
+            await this.transcodeToResolution(jobId, inputDir, outputDir);
 
             await this.uploadTranscodedFiles(videoKey, outputDir);
-            await this.createAndUploadIndexPlaylist(videoKey);
+            // await this.createAndUploadIndexPlaylist(videoKey);
             await this.notifyCompletion(videoKey);
 
         } catch (error) {
@@ -83,7 +125,7 @@ export class TranscoderService {
                     .on('finish', resolve);
             });
 
-            return inputPath;
+            return inputPath;inputPath
         } catch (error) {
             console.error(`Error downloading video ${videoKey}:`, error);
             throw error;
@@ -91,13 +133,11 @@ export class TranscoderService {
     }
 
     private async transcodeToResolution(
-        videoKey: string,
         jobId: string,
-        resolution: { resolution: string; width: number; height: number; bitrate: string },
         inputDir: string,
         outputDir: string
     ) {
-        const containerName = `video-transcoder-${jobId}-${resolution.resolution}`;
+        const containerName = `video-transcoder-${jobId}`;
         console.log('Input directory:', inputDir);
         console.log('Output directory:', outputDir);
 
@@ -105,24 +145,8 @@ export class TranscoderService {
             Image: 'jrottenberg/ffmpeg',
             name: containerName,
             Cmd: [
-                '-i', '/input/input.mp4', // Changed to match the downloaded file name
-                '-c:v', 'libx264',
-                '-c:a', 'aac',
-                '-b:v', resolution.bitrate,
-                '-maxrate', resolution.bitrate,
-                '-bufsize', `${parseInt(resolution.bitrate) * 2}k`,
-                '-vf', `scale=${resolution.width}:${resolution.height}`,
-                '-preset', 'veryfast',
-                '-profile:v', 'main',
-                '-sc_threshold', '0',
-                '-g', '48',
-                '-keyint_min', '48',
-                '-hls_time', '4',
-                '-hls_list_size', '0',
-                '-hls_segment_filename', `/output/${resolution.resolution}-%03d.ts`,
-                '-hls_flags', 'independent_segments',
-                '-f', 'hls',
-                `/output/${resolution.resolution}.m3u8`,
+                '-i', '/input/input.mp4',
+                ...this.createResolutionCommands(),
             ],
             HostConfig: {
                 Binds: [
@@ -143,28 +167,53 @@ export class TranscoderService {
             });
 
             await container.start();
-            // const logs = await this.getDockerLogs(container);
-            // console.log(`Transcoding logs for ${resolution.resolution}:`, logs);
-
             const result = await container.wait();
             if (result.StatusCode !== 0) {
                 throw new Error(`Transcoding failed with status ${result.StatusCode}`);
             }
         } catch (error) {
-            console.error(`Error processing resolution ${resolution.resolution}:`, error);
+            console.error(`Error processing ${containerName}:`, error);
             throw error;
         }
     }
 
     private async uploadTranscodedFiles(videoKey: string, outputDir: string) {
-        const files = await fs.promises.readdir(outputDir);
-        
-        for (const file of files) {
-            const filePath = path.join(outputDir, file);
-            const fileContent = await fs.promises.readFile(filePath);
-            const s3Key = `${this.getDirectoryFromFilePath(videoKey)}${file}`;
-            
-            await this.uploadFileToS3(s3Key, fileContent);
+        // Upload the master.m3u8 file as a buffer
+        const masterPlaylistPath = path.join(outputDir, 'master.m3u8');
+        if (fs.existsSync(masterPlaylistPath)) {
+            const masterBuffer = await fs.promises.readFile(masterPlaylistPath);
+            await this.uploadFileToS3(`${this.getDirectoryFromFilePath(videoKey)}master.m3u8`, masterBuffer);
+        }
+    
+        // Iterate over each resolution folder and upload files as buffers
+        for (const resolution of this.resolutions) {
+            const resolutionDir = path.join(outputDir, resolution.resolution);
+    
+            // Skip resolution if its folder does not exist
+            if (!fs.existsSync(resolutionDir)) {
+                console.warn(`Resolution directory ${resolutionDir} not found.`);
+                continue;
+            }
+    
+            // Upload playlist.m3u8 (resolution playlist)
+            const playlistPath = path.join(resolutionDir, 'playlist.m3u8');
+            if (fs.existsSync(playlistPath)) {
+                const playlistBuffer = await fs.promises.readFile(playlistPath);
+                const s3PlaylistKey = `${this.getDirectoryFromFilePath(videoKey)}${resolution.resolution}/playlist.m3u8`;
+                await this.uploadFileToS3(s3PlaylistKey, playlistBuffer);
+            }
+    
+            // Upload all segment files (.ts files) as buffers
+            const files = await fs.promises.readdir(resolutionDir);
+            for (const file of files) {
+                if (file.endsWith('.ts')) {  // Only upload .ts files
+                    const filePath = path.join(resolutionDir, file);
+                    const fileBuffer = await fs.promises.readFile(filePath);
+                    const s3Key = `${this.getDirectoryFromFilePath(videoKey)}${resolution.resolution}/${file}`;
+                    
+                    await this.uploadFileToS3(s3Key, fileBuffer);
+                }
+            }
         }
     }
 
@@ -181,7 +230,7 @@ export class TranscoderService {
         };
 
         try {
-            const response = await this.s3Client.send(new PutObjectCommand(uploadParams));
+            await this.s3Client.send(new PutObjectCommand(uploadParams));
             console.log(`Successfully uploaded ${key} to S3`);
         } catch (error) {
             console.error(`Failed to upload ${key} to S3:`, error);
@@ -191,19 +240,19 @@ export class TranscoderService {
 
     private async createAndUploadIndexPlaylist(videoKey: string) {
         const directoryKey = this.getDirectoryFromFilePath(videoKey);
-        const indexContent = this.generateIndexPlaylistContent();
+        const indexContent = this.generateMasterPlaylistContent();
         const indexKey = `${directoryKey}index.m3u8`;
         
         await this.uploadFileToS3(indexKey, Buffer.from(indexContent));
-        console.log(`Created and uploaded index playlist for ${directoryKey}`);
+        console.log(`Created and uploaded master index playlist for ${directoryKey}`);
     }
 
-    private generateIndexPlaylistContent(): string {
+    private generateMasterPlaylistContent(): string {
         let indexContent = '#EXTM3U\n#EXT-X-VERSION:3\n';
 
         for (const resolution of this.resolutions) {
             indexContent += `#EXT-X-STREAM-INF:BANDWIDTH=${parseInt(resolution.bitrate) * 1000},RESOLUTION=${resolution.width}x${resolution.height}\n`;
-            indexContent += `${resolution.resolution}.m3u8\n`;
+            indexContent += `${resolution.resolution}/playlist.m3u8\n`;
         }
 
         return indexContent;
@@ -221,5 +270,4 @@ export class TranscoderService {
     private async notifyCompletion(videoKey: string) {
         console.log(`Transcoding completed for video: ${videoKey}`);
     }
-
 }
