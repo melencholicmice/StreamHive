@@ -12,7 +12,7 @@ function App() {
         <Route path="/" element={<AllVideos />} />
         <Route path='/login' element={<LoginPage />} />
         <Route path="/file-upload" element={<UploadFilePage />} />
-        <Route path="/video*" element={<VideoPage />} />
+        <Route path="/video" element={<VideoPage />} />
         <Route path="*" element={<NotFound />} /> {/* For handling 404 */}
       </Routes>
     </Router>

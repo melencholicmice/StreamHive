@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import VideoPlayer from '../components/videoPlayer';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getVideosById } from '../services/getAllVideos';
 import { config } from '../config';
+import VideoPlayer from '../components/videoPlayer';
 
 interface VideoDetails {
   title: string;
@@ -14,14 +14,12 @@ interface VideoDetails {
 const VideoPage = () => {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  console.log(id);
   const [videoDetails, setVideoDetails] = useState<VideoDetails>({
     title: '',
     username: '',
     description: '',
     videoUrl: ''
   });
-
   useEffect(() => {
     const fetchVideoDetails = async () => {
       await getVideosById(id!).then((video) => {
@@ -42,7 +40,12 @@ const VideoPage = () => {
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
           <div className="p-4">
-            <VideoPlayer videoSource={videoDetails.videoUrl} />
+            <VideoPlayer 
+            data={{
+                src: videoDetails.videoUrl,
+              }}
+              className="w-full h-96"
+            />
           </div>
           
           <div className="p-6">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { getAllVideos, VideoResponse } from '../services/getAllVideos';
 import VideoPlayer from '../components/videoPlayer';
@@ -30,7 +29,12 @@ const AllVideos = () => {
               <h2 className="text-xl font-medium text-gray-900 hover:text-blue-500">
                 {video.title}
               </h2>
-              <VideoPlayer videoSource={`${config.s3Endpoint}/${video.bucket}index.m3u8`} />
+              <VideoPlayer 
+                  data={{
+                    src: video.bucket,
+                  }}
+                  className="w-full h-96"
+              />
             </a>
           ))}
           {videos.length === 0 && (

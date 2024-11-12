@@ -33,13 +33,14 @@ export class TranscoderService {
     }
 
     private createResolutionCommands(): string[] {
+        const videoFilterComplex = `[0:v]split=${this.resolutions.length}${this.resolutions.map((_, index) => `[v${index}]`).join('')};${
+            this.resolutions.map((resolution, index) => 
+                `[v${index}]scale=w=${resolution.width}:h=${resolution.height}[v${index}out]`
+            ).join(';')
+        }`;
+
         const commands = [
-            '-filter_complex',
-            `[0:v]split=${this.resolutions.length}${this.resolutions.map((_, index) => `[v${index}]`).join('')};${
-                this.resolutions.map((resolution, index) => 
-                    `[v${index}]scale=w=${resolution.width}:h=${resolution.height}[v${index}out]`
-                ).join(';')
-            }`,
+            '-filter_complex', videoFilterComplex,
             ...this.resolutions.flatMap((resolution, index) => [
                 `-map`, `[v${index}out]`,
                 `-c:v:${index}`, 'libx264',
@@ -51,22 +52,15 @@ export class TranscoderService {
                 '-sc_threshold', '0',
                 '-g', '48',
                 '-keyint_min', '48',
-                `-hls_segment_filename`, `/output/${resolution.resolution}/segment-%03d.ts`, // Customized output folder per resolution
+                `-hls_time`, '4',
+                `-hls_list_size`, '0',
+                `-hls_segment_filename`, `/output/${resolution.resolution}/segment-%03d.ts`,
                 `-hls_flags`, 'independent_segments',
                 `-f`, 'hls',
-                `/output/${resolution.resolution}/playlist.m3u8`, // Playlist file per resolution
-            ]),
-            // Configure audio streams and playlist generation
-            ...this.resolutions.flatMap((_, index) => [
-                `-map`, 'a:0',
-                `-c:a:${index}`, 'aac',
-                `-b:a:${index}`, `${192 - (index * 48)}k`,
-                `-ac`, '2'
+                `/output/${resolution.resolution}/playlist.m3u8`,
             ]),
             '-master_pl_name', '/output/master.m3u8', // Master playlist
             '-hls_playlist_type', 'vod',
-            '-hls_time', '4',
-            '-hls_list_size', '0',
             '-var_stream_map', this.resolutions.map((_, index) => `v:${index},a:${index}`).join(' ')
         ];
         

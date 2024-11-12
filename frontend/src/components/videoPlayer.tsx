@@ -1,109 +1,111 @@
-import React, { useRef, useEffect } from "react";
-import videojs, { VideoJsPlayer } from "video.js";
-import "video.js/dist/video-js.css";
-import "videojs-contrib-quality-levels";
-import "videojs-http-source-selector";
+import Hls from "hls.js";
+import { useEffect, useRef } from "react";
 
 interface VideoPlayerProps {
-  videoSource: string;
-  onVideoEnd?: () => void; // Add callback for video end
+  data: {
+    src: string;
+  };
+  className?: string;
+  [key: string]: any;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = (props) => {
-  const videoRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<VideoJsPlayer | null>(null);
-  const { videoSource, onVideoEnd } = props;
-
-  const videoPlayerOptions = {
-    fluid: true,
-    controls: true,
-    autoplay: true,
-    playbackRates: [0.5, 1, 1.5, 2],
-    controlBar: {
-      playToggle: true,
-      volumePanel: {
-        inline: false,
-      },
-      fullscreenToggle: true,
-      currentTimeDisplay: true,
-      timeDivider: true,
-      durationDisplay: true,
-      remainingTimeDisplay: true,
-      progressControl: {
-        seekBar: true
-      }
-    },
-    plugins: {
-      httpSourceSelector: { default: 'auto' },
-    },
-    sources: [
-      {
-        src: videoSource,
-        type: "application/x-mpegURL",
-      },
-    ],
-  };
-
-  const handlePlayerReady = (player: VideoJsPlayer) => {
-    playerRef.current = player;
-
-    player.on("waiting", () => {
-      videojs.log("player is waiting");
-    });
-
-    player.on("dispose", () => {
-      videojs.log("player will dispose");
-    });
-
-    player.on("ended", () => {
-      videojs.log("video ended");
-      if (onVideoEnd) {
-        onVideoEnd();
-      }
-    });
-
-    player.on("loadedmetadata", () => {
-      player.duration(); // This ensures duration is properly loaded
-    });
-  };
+export default function VideoPlayer({ data, className = '', ...props }: VideoPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   useEffect(() => {
-    if (!playerRef.current) {
-      const videoElement = document.createElement("video-js");
+    // Configuration for HLS
+    const config = {
+      debug: true,
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 90,
+      manifestLoadingMaxRetry: 3,
+      manifestLoadingRetryDelay: 1000,
+      manifestLoadingMaxRetryTimeout: 64000,
+      startLevel: -1,
+      defaultAudioCodec: undefined,
+      // Adjust buffer size settings
+      maxBufferSize: 60 * 1000 * 1000, // 60MB
+      maxBufferLength: 30,
+      maxMaxBufferLength: 600,
+    };
 
-      videoElement.classList.add("vjs-big-play-centered");
+    if (Hls.isSupported()) {
+      // Cleanup previous instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
+
+      // Create new instance
+      const hls = new Hls(config);
+      hlsRef.current = hls;
+
+      // Error handling
+      hls.on(Hls.Events.ERROR, (event: string, data: any) => {
+        console.error('HLS Error:', event, data);
+        
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.log('Fatal network error encountered, trying to recover...');
+              hls.startLoad();
+              break;
+              
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('Fatal media error encountered, trying to recover...');
+              // handleMediaError(hls);
+              break;
+              
+            default:
+              console.log('Fatal error, cannot recover');
+              hls.destroy();
+              break;
+          }
+        }
+      });
+
+      // Loading handlers
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('Manifest loaded successfully');
+      });
+
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        console.log('Media attached successfully');
+        hls.loadSource(data.src);
+      });
+
+      // Attach media
       if (videoRef.current) {
-        videoRef.current.appendChild(videoElement);
+        hls.attachMedia(videoRef.current);
       }
 
-      const player = (playerRef.current = videojs(videoElement, videoPlayerOptions, () => {
-        videojs.log("player is ready");
-        handlePlayerReady(player);
-      }));
+    } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
+      // For browsers that support HLS natively (Safari)
+      videoRef.current.src = data.src;
     } else {
-      const player = playerRef.current;
-
-      player.autoplay(videoPlayerOptions.autoplay);
-      player.src(videoPlayerOptions.sources);
+      console.error('HLS is not supported in this browser');
     }
-  }, [videoSource]);
 
-  useEffect(() => {
-    const player = playerRef.current;
-
+    // Cleanup function
     return () => {
-      if (player && !player.isDisposed()) {
-        player.dispose();
-        playerRef.current = null;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
     };
-  }, []);
+  }, [data.src]);
+
+  // Helper function to handle media errors
+
 
   return (
-    <div data-vjs-player>
-      <div ref={videoRef} style={{ width: '100%' }} />
-    </div>
+    <video
+      ref={videoRef}
+      controls
+      playsInline // Better mobile support
+      {...props}
+      className={className}
+    />
   );
-};
-
-export default VideoPlayer;
+}
