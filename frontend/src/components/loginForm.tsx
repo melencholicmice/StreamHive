@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { loginPost } from '../services/loginPost';
+import { useNavigate } from 'react-router-dom';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
+  const navigate = useNavigate();
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
@@ -19,6 +21,7 @@ const LoginForm = () => {
       const loginStatus = await loginPost(email, password);
       if (loginStatus.success) {
         setMessage(loginStatus.message || 'Login successful');
+        navigate('/profile');
       } else {
         setMessage(loginStatus.message || 'Login failed');
       }

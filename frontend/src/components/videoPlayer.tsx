@@ -25,7 +25,6 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
       manifestLoadingMaxRetryTimeout: 64000,
       startLevel: -1,
       defaultAudioCodec: undefined,
-      // Adjust buffer size settings
       maxBufferSize: 60 * 1000 * 1000, // 60MB
       maxBufferLength: 30,
       maxMaxBufferLength: 600,
@@ -44,19 +43,18 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
       // Error handling
       hls.on(Hls.Events.ERROR, (event: string, data: any) => {
         console.error('HLS Error:', event, data);
-        
+
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
               console.log('Fatal network error encountered, trying to recover...');
               hls.startLoad();
               break;
-              
+
             case Hls.ErrorTypes.MEDIA_ERROR:
               console.log('Fatal media error encountered, trying to recover...');
-              // handleMediaError(hls);
               break;
-              
+
             default:
               console.log('Fatal error, cannot recover');
               hls.destroy();
@@ -65,7 +63,7 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
         }
       });
 
-      // Loading handlers
+      // Manifest and Media Attach events
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         console.log('Manifest loaded successfully');
       });
@@ -73,6 +71,19 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
         console.log('Media attached successfully');
         hls.loadSource(data.src);
+      });
+
+      // Listen to audio-related events
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (event, data) => {
+        console.log('Audio tracks updated:', data.audioTracks);
+      });
+
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHING, (event, data) => {
+        console.log('Switching to audio track:', data.id);
+      });
+
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
+        console.log('Audio track switched:', data.id);
       });
 
       // Attach media
@@ -95,9 +106,6 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
       }
     };
   }, [data.src]);
-
-  // Helper function to handle media errors
-
 
   return (
     <video

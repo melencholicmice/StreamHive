@@ -161,6 +161,23 @@ export class VideosService {
         });
     }
 
-
+    async getAllUserVideosById(userId: string): Promise<Video[]> {
+        return await this.videoRepository.find({
+            where: {
+                user: {
+                    id: userId
+                }
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                bucket: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        })
+    }
 
 }

@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getAllVideos, VideoResponse } from '../services/getAllVideos';
-import VideoPlayer from '../components/videoPlayer';
-import { config } from '../config';
 
 const AllVideos = () => {
   const [videos, setVideos] = useState<VideoResponse[]>([]);
@@ -24,17 +22,12 @@ const AllVideos = () => {
             <a
               // key={video.id}
               href={`/video?id=${video.id}`}
-              className="block px-6 py-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition duration-200"
+              className="block px-6 py-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition duration-200 mb-4"
             >
               <h2 className="text-xl font-medium text-gray-900 hover:text-blue-500">
                 {video.title}
               </h2>
-              <VideoPlayer 
-                  data={{
-                    src: video.bucket,
-                  }}
-                  className="w-full h-96"
-              />
+              <p className="text-gray-600 mt-1">{video.description}</p>
             </a>
           ))}
           {videos.length === 0 && (

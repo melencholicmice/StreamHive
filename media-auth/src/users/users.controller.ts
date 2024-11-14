@@ -26,9 +26,11 @@ export class UsersController {
 
     @Get('me')
     @UseGuards(JwtAuthGuard)
-    getUser(
+    async getUser(
         @CurrentUser() user: User
     ){
-        return user;
+        const userEntity = await this.usersService.getUserById(user.id)
+        const {password , ...userObj} = userEntity;
+        return userObj
     }
 }

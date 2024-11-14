@@ -6,11 +6,13 @@ import * as os from 'os';
 import Docker from 'dockerode';
 import config from 'src/config/configuration';
 import { Readable } from 'stream';
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 @Injectable()
 export class TranscoderService {
     private docker: Docker;
     private s3Client: S3Client;
+    private sqsClient: SQSClient;
 
     private resolutions = [
         { resolution: '1080p', width: 1920, height: 1080, bitrate: '5000k' },
@@ -28,6 +30,13 @@ export class TranscoderService {
                 secretAccessKey: config.s3.secretAccessKey,
             },
             forcePathStyle: true,
+        });
+        this.sqsClient = new SQSClient({
+            region: config.sqs.region,
+            credentials: {
+                accessKeyId: config.sqs.accessKeyId,
+                secretAccessKey: config.sqs.secretAccessKey,
+            },
         });
         this.docker = new Docker();
     }
@@ -272,6 +281,23 @@ export class TranscoderService {
     }
 
     private async notifyCompletion(videoKey: string) {
-        console.log(`Transcoding completed for video: ${videoKey}`);
+        try {
+            const message = {
+                videoKey,
+                status: 'completed',
+                timestamp: new Date().toISOString()
+            };
+
+            const command = new SendMessageCommand({
+                QueueUrl: config.sqs.queueUrl,
+                MessageBody: JSON.stringify(message),
+            });
+
+            await this.sqsClient.send(command);
+            console.log(`Sent completion notification for video: ${videoKey}`);
+        } catch (error) {
+            console.error(`Error sending completion notification for ${videoKey}:`, error);
+            throw error;
+        }
     }
 }

@@ -87,4 +87,12 @@ export class VideosController {
     async getVideoById(@Query('videoId') videoId: string){
         return this.videoService.getVideoById(videoId);
     }
+
+    @Get('user-videos')
+    @UseGuards(JwtAuthGuard)
+    async getAllUserVideos(
+        @CurrentUser() user : User
+    ){
+        return await this.videoService.getAllUserVideosById(user.id);
+    }
 }
