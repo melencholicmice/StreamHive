@@ -1,18 +1,18 @@
-# 🎬 StreamHive
+# StreamHive
 
-StreamHive is a cutting-edge video streaming platform designed to deliver exceptional viewing experiences. With its robust architecture and seamless content delivery, StreamHive empowers creators and businesses to share their video content with audiences worldwide. ✨
+StreamHive is a video streaming platform where you can upload video using multipart upload and videos will get transcoded to multiple resoultions and will be stored in S3.
+## Architecture Diagram
+<img src="architecture-diagram.svg" width="1000" height="800" alt="Architecture Diagram">
 
-## 🔧 Components
+## Components
 
-### 🔐 Media Authentication Service (media-auth)
+### Media Authentication Service (media-auth)
 
 The media authentication service ensures secure access to content through comprehensive authentication and authorization mechanisms.
 
-### 🎥 Media Transcoder Service (media-transcoder) 
+### Media Transcoder Service (media-transcoder) 
 
 The media transcoder service optimizes video content for the best possible viewing experience across all devices and network conditions.
 
-### 🖥️ Frontend (frontend)
+### Frontend (frontend)
 The frontend is the user interface that allows users to browse, upload, and watch videos.
-
-
