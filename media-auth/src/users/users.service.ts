@@ -6,26 +6,26 @@ import { createUserDto, createUserResponseDto } from './dtos/createUser.dto';
 
 @Injectable()
 export class UsersService {
-    constructor(
-        @InjectRepository(User) private userRepository: Repository<User>
-    ) {}
+  constructor(
+    @InjectRepository(User) private userRepository: Repository<User>,
+  ) {}
 
-    async create(user: createUserDto): Promise<createUserResponseDto> {
-        const newUser = this.userRepository.create(user);
-        const savedUser = await this.userRepository.save(newUser);
-        const { password, ...result } = savedUser;
-        return result;
-    }
-    
-    async findOneByEmail(email:string) : Promise<User | null> {
-        return await this.userRepository.findOne({ where: { email } })
-    }
+  async create(user: createUserDto): Promise<createUserResponseDto> {
+    const newUser = this.userRepository.create(user);
+    const savedUser = await this.userRepository.save(newUser);
+    const { password, ...result } = savedUser;
+    return result;
+  }
 
-    async getAllUser() : Promise<User[]>{
-        return await this.userRepository.find();
-    }
+  async findOneByEmail(email: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { email } });
+  }
 
-    async getUserById(id: string) : Promise<User | null> {
-        return await this.userRepository.findOne({ where: { id } })
-    }
+  async getAllUser(): Promise<User[]> {
+    return await this.userRepository.find();
+  }
+
+  async getUserById(id: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { id } });
+  }
 }

@@ -9,6 +9,6 @@ import { UsersController } from './users.controller';
   imports: [ZodValidationPipe, TypeOrmModule.forFeature([User])],
   exports: [UsersService],
   providers: [UsersService],
-  controllers: [UsersController]
+  controllers: [UsersController],
 })
 export class UsersModule {}

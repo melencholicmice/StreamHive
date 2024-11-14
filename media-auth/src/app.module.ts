@@ -17,7 +17,7 @@ import { BullModule } from '@nestjs/bullmq';
       database: config.database.database,
       autoLoadEntities: true,
       synchronize: true,
-      entities:[__dirname + '/../**/*.entity{.ts}',]
+      entities: [__dirname + '/../**/*.entity{.ts}'],
     }),
     BullModule.forRoot({
       connection: {
@@ -26,7 +26,9 @@ import { BullModule } from '@nestjs/bullmq';
         // password: config.reddis.password,
       },
     }),
-    UsersModule, AuthModule, VideosModule,
+    UsersModule,
+    AuthModule,
+    VideosModule,
   ],
   controllers: [],
   providers: [],

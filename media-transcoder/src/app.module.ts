@@ -9,9 +9,9 @@ import config from './config/configuration';
       connection: {
         host: config.redis.host,
         port: config.redis.port,
-      }
+      },
     }),
-    TranscoderModule
+    TranscoderModule,
   ],
   controllers: [],
   providers: [],

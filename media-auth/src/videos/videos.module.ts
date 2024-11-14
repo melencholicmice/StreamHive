@@ -6,14 +6,13 @@ import { Video } from './video.entity';
 import { BullModule } from '@nestjs/bullmq';
 
 @Module({
-  imports:[
+  imports: [
     TypeOrmModule.forFeature([Video]),
     BullModule.registerQueue({
       name: 'video-queue',
-    })
+    }),
   ],
   providers: [VideosService],
-  controllers: [VideosController]
+  controllers: [VideosController],
 })
 export class VideosModule {}
-

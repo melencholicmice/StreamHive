@@ -11,15 +11,15 @@ function getEnvOrThrow(key: string): string {
 }
 
 const config = {
-  port: parseInt(process.env.PORT,10) || 3000,
-//   database: {
-//     url: getEnvOrThrow('DATABASE_URL'),
-//     host: getEnvOrThrow('DATABASE_HOST'),
-//     port: parseInt(process.env.DATABASE_PORT,10) || 5432,
-//     username: getEnvOrThrow('DATABASE_USERNAME'),
-//     password: getEnvOrThrow('DATABASE_PASSWORD'),
-//     database: getEnvOrThrow('DATABASE_NAME'),
-//   },
+  port: parseInt(process.env.PORT, 10) || 3000,
+  //   database: {
+  //     url: getEnvOrThrow('DATABASE_URL'),
+  //     host: getEnvOrThrow('DATABASE_HOST'),
+  //     port: parseInt(process.env.DATABASE_PORT,10) || 5432,
+  //     username: getEnvOrThrow('DATABASE_USERNAME'),
+  //     password: getEnvOrThrow('DATABASE_PASSWORD'),
+  //     database: getEnvOrThrow('DATABASE_NAME'),
+  //   },
   // rabbitMq:{
   //   url: getEnvOrThrow('RABBITMQ_URL'),
   //   host: getEnvOrThrow('RABBITMQ_HOST'),
@@ -38,7 +38,7 @@ const config = {
     host: getEnvOrThrow('REDIS_HOST'),
     port: parseInt(process.env.REDIS_PORT, 10) || 6379,
     password: getEnvOrThrow('REDIS_PASSWORD'),
-  }
+  },
 };
 
 export default config;

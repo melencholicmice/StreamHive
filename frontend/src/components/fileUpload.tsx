@@ -3,7 +3,7 @@ import { initiateMultipartUpload } from '../services/initiateMultipartUpload';
 import { getPresignedUrl } from '../services/getPresignedUrl';
 import { uploadChunk } from '../services/uploadChunk';
 import { completeMultipartUpload } from '../services/completeMultipartUrl';
-// import { removeFileExtension } from '../utils/removeFileExtention';
+
 
 type Part = {
   ETag: string;
@@ -69,7 +69,7 @@ function FileUpload() {
       setDescription('');
       setVideoName('');
     }
-    catch(error){
+    catch{
       alert('Failed to upload file');
     }
   };
