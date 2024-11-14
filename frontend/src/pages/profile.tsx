@@ -40,12 +40,14 @@ const Profile = ({ id, username, firstName, lastName, email, createdAt, updatedA
           <div className="space-y-4">
             {videos.map((video) => (
               <div key={video.id} className="bg-white shadow rounded-lg p-4">
-                <h4 className="font-bold">{video.title}</h4>
-                <p className="text-gray-600">{video.description}</p>
-                <p className="text-sm text-gray-500 mt-2">Status: {video.status}</p>
-                <p className="text-sm text-gray-500">
-                  Uploaded: {new Date(video.createdAt).toLocaleDateString()}
-                </p>
+                <a href={`/video?id=${video.id}`}>
+                  <h4 className="font-bold">{video.title}</h4>
+                  <p className="text-gray-600">{video.description}</p>
+                  <p className="text-sm text-gray-500 mt-2">Status: {video.status}</p>
+                  <p className="text-sm text-gray-500">
+                    Uploaded: {new Date(video.createdAt).toLocaleDateString()}
+                  </p>
+                </a>
               </div>
             ))}
           </div>

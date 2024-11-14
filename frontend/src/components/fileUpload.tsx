@@ -64,7 +64,7 @@ function FileUpload() {
         videoId,
         videoName
       )
-      alert('File uploaded successfully');
+      alert('File uploaded successfully please wait for some time for the video to be processed');
       setFile(null);
       setDescription('');
       setVideoName('');
