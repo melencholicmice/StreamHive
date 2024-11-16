@@ -1,5 +1,5 @@
 import Hls from "hls.js";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface VideoPlayerProps {
   data: {
@@ -12,11 +12,11 @@ interface VideoPlayerProps {
 export default function VideoPlayer({ data, className = '', ...props }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const [qualities, setQualities] = useState<{ height: number; level: number }[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1);
 
   useEffect(() => {
-    // Configuration for HLS
     const config = {
-      debug: true,
       enableWorker: true,
       lowLatencyMode: true,
       backBufferLength: 90,
@@ -24,81 +24,59 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
       manifestLoadingRetryDelay: 1000,
       manifestLoadingMaxRetryTimeout: 64000,
       startLevel: -1,
-      defaultAudioCodec: undefined,
-      maxBufferSize: 60 * 1000 * 1000, // 60MB
+      maxBufferSize: 60 * 1000 * 1000,
       maxBufferLength: 30,
       maxMaxBufferLength: 600,
     };
 
     if (Hls.isSupported()) {
-      // Cleanup previous instance
       if (hlsRef.current) {
         hlsRef.current.destroy();
       }
 
-      // Create new instance
       const hls = new Hls(config);
       hlsRef.current = hls;
 
-      // Error handling
-      hls.on(Hls.Events.ERROR, (event: string, data: any) => {
-        console.error('HLS Error:', event, data);
-
+      hls.on(Hls.Events.ERROR, (_event: string, data: any) => {
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.log('Fatal network error encountered, trying to recover...');
               hls.startLoad();
               break;
-
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.log('Fatal media error encountered, trying to recover...');
               break;
-
             default:
-              console.log('Fatal error, cannot recover');
               hls.destroy();
               break;
           }
         }
       });
 
-      // Manifest and Media Attach events
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('Manifest loaded successfully');
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        const levels = data.levels.map((level: any, index: number) => ({
+          height: level.height,
+          level: index
+        }));
+        setQualities(levels);
+        setCurrentQuality(hls.currentLevel);
       });
 
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        console.log('Media attached successfully');
         hls.loadSource(data.src);
       });
 
-      // Listen to audio-related events
-      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (event, data) => {
-        console.log('Audio tracks updated:', data.audioTracks);
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        setCurrentQuality(data.level);
       });
 
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHING, (event, data) => {
-        console.log('Switching to audio track:', data.id);
-      });
-
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
-        console.log('Audio track switched:', data.id);
-      });
-
-      // Attach media
       if (videoRef.current) {
         hls.attachMedia(videoRef.current);
       }
 
     } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
-      // For browsers that support HLS natively (Safari)
       videoRef.current.src = data.src;
-    } else {
-      console.error('HLS is not supported in this browser');
     }
 
-    // Cleanup function
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -107,13 +85,36 @@ export default function VideoPlayer({ data, className = '', ...props }: VideoPla
     };
   }, [data.src]);
 
+  const handleQualityChange = (level: number) => {
+    if (hlsRef.current) {
+      hlsRef.current.currentLevel = level;
+    }
+  };
+
   return (
-    <video
-      ref={videoRef}
-      controls
-      playsInline // Better mobile support
-      {...props}
-      className={className}
-    />
+    <div>
+      <video
+        ref={videoRef}
+        controls
+        playsInline
+        {...props}
+        className={className}
+      />
+      {qualities.length > 0 && (
+        <div style={{ marginTop: '10px' }}>
+          <select
+            value={currentQuality}
+            onChange={(e) => handleQualityChange(Number(e.target.value))}
+          >
+            <option value={-1}>Auto</option>
+            {qualities.map((quality) => (
+              <option key={quality.level} value={quality.level}>
+                {quality.height}p
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
   );
 }

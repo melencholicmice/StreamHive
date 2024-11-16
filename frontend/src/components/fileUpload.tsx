@@ -14,10 +14,12 @@ function FileUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [description, setDescription] = useState<string>('');
   const [videoName, setVideoName] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFile(e.target.files[0]);
+      setUploadProgress(0);
     }
   };
 
@@ -44,6 +46,7 @@ function FileUpload() {
       const partSize = 5 * 1024 * 1024; // 5MB
       const parts: Part[] = [];
       let partNumber = 1;
+      const totalParts = Math.ceil(file.size / partSize);
   
       for (let start = 0; start < file.size; start += partSize) {
         const end = Math.min(start + partSize, file.size);
@@ -54,6 +57,10 @@ function FileUpload() {
         const uploadResponse = await uploadChunk(presignedUrl, fileChunk, uploadId);
         const eTag = uploadResponse.headers.get('ETag') || '';
         parts.push({ ETag: eTag, PartNumber: partNumber });
+        
+        const progress = Math.round((partNumber / totalParts) * 100);
+        setUploadProgress(progress);
+        
         partNumber++;
       }
   
@@ -68,9 +75,11 @@ function FileUpload() {
       setFile(null);
       setDescription('');
       setVideoName('');
+      setUploadProgress(0);
     }
     catch{
       alert('Failed to upload file');
+      setUploadProgress(0);
     }
   };
 
@@ -103,6 +112,17 @@ function FileUpload() {
           className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
         />
       </div>
+      {uploadProgress > 0 && (
+        <div className="mb-4">
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <p className="text-sm text-gray-600 mt-1 text-center">{uploadProgress}% uploaded</p>
+        </div>
+      )}
       <button 
         onClick={uploadFile}
         className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-200"
