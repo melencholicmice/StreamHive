@@ -165,12 +165,24 @@ export class VideosService {
       where: {
         id: videoId,
       },
+      relations: ['user'], 
     });
+  
     if (!video) {
       throw new Error('Video not found');
     }
-    return video;
+  
+    
+    const result = {
+      ...video,
+      id: video.user.username, 
+    };
+  
+    delete result.user; 
+  
+    return result;
   }
+  
 
   async getAllVideos(): Promise<Video[]> {
     return await this.videoRepository.find({
